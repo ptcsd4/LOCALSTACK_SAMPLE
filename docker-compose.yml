@@ -1,0 +1,23 @@
+version: '3.4'
+services:
+  localstack:
+    container_name: "localstack"
+    image: localstack/localstack
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    privileged: true
+    environment:
+      - SERVICES=sqs,lambda,logs
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - LAMBDA_EXECUTOR=docker
+      - LAMBDA_CONTAINER_REGISTRY=mlupin/docker-lambda
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOSTNAME_EXTERNAL=localstack
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+networks: 
+  default: 
+    external: 
+      name: local-network

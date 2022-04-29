@@ -1,0 +1,31 @@
+version: "3.4"
+services:
+ ecs:
+    container_name: "ecs"
+    environment:
+      AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: /creds
+      ECS_CONTAINER_METADATA_URI: http://169.254.170.2/v3
+      SQS_ENDPOINT : http://localstack:4566
+      SQS_NAME : sqs
+    image : ecs_sample:latest
+    labels:
+      ecs-local.task-definition-input.type: local
+      ecs-local.task-definition-input.value: ecs:1
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /aws/ecs
+        awslogs-region: us-east-1
+        awslogs-stream-prefix: ecs
+    volumes:
+      - "${USERPROFILE}\\.aws:/root/.aws"
+    ports:
+    - target: 80
+      published: 1566
+      protocol: tcp
+
+networks: 
+  default: 
+    external: 
+      name: local-network
+    

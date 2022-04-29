@@ -1,0 +1,73 @@
+version: "3"
+
+vars:
+  ARTIFACT_PATH: ./artifact/lambda.zip
+  SQS_URL: http://localhost:4566/000000000000/sqs
+
+tasks:
+  init : 
+    desc : 建立全域的 docker network，跨compose 使用
+    cmds :
+      - docker network create local-network
+  localstack :
+    desc:  建立本地工作站 (localstack)
+    cmds :
+      - docker-compose up -d localstack  
+  package_lambda :
+    desc : 發行lambda 函式 (.net6)
+    cmds :
+      - dotnet lambda package -pl ./lambda_sample -o {{.ARTIFACT_PATH}}
+  
+  package_ecs :
+    desc : 發行WEB API (.net6)
+    cmds : 
+      - docker build -t ecs_sample:latest ./ecs_sample
+  
+  lambda :
+    deps: [ package_lambda ]
+    desc: 在工作站 (localstack) 中，啟動lambda
+    vars:
+      FUNCTION_NAME: sqs-dotnet-function
+      FUNCTION_ENTRY : lambda_sample::lambda_sample.Function::FunctionHandler
+    cmds :
+      - AWS_PAGER=""  awslocal lambda delete-function 
+        --function-name {{.FUNCTION_NAME}}
+      - AWS_PAGER=""  awslocal lambda create-function 
+        --function-name {{.FUNCTION_NAME}}
+        --zip-file fileb://{{.ARTIFACT_PATH}}
+        --handler {{.FUNCTION_ENTRY}}
+        --runtime dotnet6 
+        --role arn:aws:iam::000000000000:role/{{.ARTIFACT_PATH}}
+      - AWS_PAGER=""  awslocal lambda create-event-source-mapping 
+        --function-name  {{.FUNCTION_NAME}}
+        --event-source-arn arn:aws:sqs:us-east-1:000000000000:sqs
+
+  sqs : 
+    desc : 在工作站 (localstack) 中，啟動SQS
+    vars :
+      QUEUE_NAME : sqs
+    cmds : 
+     - awslocal sqs delete-queue --queue-url  {{.SQS_URL}}
+     - awslocal sqs create-queue --queue-name {{.QUEUE_NAME}}
+
+  put-sqs :
+    desc : 對本地端的 SQS 推送訊息
+    cmds :
+     - awslocal sqs send-message --queue-url {{.SQS_URL}} --message-body "PUSH TO MESSAGE ." 
+ 
+  tail-log :  
+    desc : 追蹤 lambda log 
+    cmds : 
+     - awslocal logs tail /aws/lambda/sqs-dotnet-function --follow 
+
+  ecs : 
+    deps: [package_ecs]
+    desc : 透過 ecs-cli 啟動 web api
+    cmds : 
+     - ecs-cli local up
+
+
+      
+   
+
+ 
